@@ -63,34 +63,38 @@ def lookat(dr, fw):
     return mu.Quaternion(rotAxis, fw.angle(dr))
 
 
+def lookrotation(fw, up):
+    fwn = mu.Vector(fw).normalized()
+    upn = mu.Vector(up).normalized()
+    left = fwn.cross(upn).normalized()
+    mtx = mu.Matrix([left, fwn, upn])
+    qtr = mtx.to_quaternion().inverted()
+    return qtr
+
+
 def data_transfer():
-    # obj = bpy.data.objects[bpy.context.scene.vr_hands.armature]
     obj = bpy.context.scene.vr_hands.armature
     bones = obj.pose.bones
     data = server.data
 
     if "right" in data:
         dr = data["right"]
-        bones["wrist_r"].location = ncoords(dr["palm_position"])
+        ploc = ncoords(dr["palm_position"])
+        bones["wrist_r"].location = ploc
+        pnorm = ncoords(dr["palm_normal"])
+        pdir = ncoords(dr["direction"])
+        bones["wrist_r"].rotation_quaternion = lookrotation(pdir, pnorm)
 
-        d_pyr = dr["direction_pyr"]
-        n_pyr = dr["palm_normal_pyr"]
-        qroll = mu.Quaternion(mu.Vector([0.0, -1.0, 0.0]), n_pyr[2])
-        qpitch = mu.Quaternion(mu.Vector([-1.0, 0.0, 0.0]), d_pyr[0])
-        qyaw = mu.Quaternion(mu.Vector([0.0, 0.0, 1.0]), d_pyr[1])
-        bones["wrist_r"].rotation_quaternion = qroll @ qpitch @ qyaw
-
-        # for f in range(5):
-        #     for j in range(1, 4):
-        #         jt = "finger_{}_{}".format(f, j)
-        #         jtp = jt + "_prev_joint"
-        #         jtn = jt + "_next_joint"
-        #         bb = bones["finger_{}_{}_r".format(finger_names[f], j - 1)]
-        #         vdif = ncoords(dr[jtn]) - ncoords(dr[jtp])
-        #         bb.location = vdif
-        #         bb.rotation_quaternion = lookat(vdif, mu.Vector([0.0, 1.0, 0.0]))
-        # bb.rotation_quaternion = mu.Quaternion((1.0, 0.0, 0.0, 0.0))
-        # rqt = bb.rotation_quaternion.inverted()
+        for f in range(5):
+            for j in range(1, 4):
+                jt = "finger_{}_{}".format(f, j)
+                jprev = ncoords(dr[jt + "_prev_joint"])
+                jnext = ncoords(dr[jt + "_next_joint"])
+                bb = bones["finger_{}_{}_r".format(finger_names[f], j - 1)]
+                vdif = jnext - jprev
+                # bb.location = vdif
+                bb.rotation_quaternion = lookat(vdif, mu.Vector([0.0, 1.0, 0.0]))
+                # bb.rotation_quaternion = lookrotation(vdif, pnorm)
 
     # 100 fps
     return 0.01
@@ -117,6 +121,10 @@ class OBJECT_OT_StopVRHServer(bpy.types.Operator):
         print("Stopping VR hands...")
         context.scene.vr_hands.active = False
         server.stop()
+        # reset bones
+        for b in context.scene.vr_hands.armature.pose.bones:
+            b.rotation_quaternion = mu.Quaternion((1.0, 0.0, 0.0), 0.0)
+            b.location = mu.Vector((0.0, 0.0, 0.0))
         # bpy.app.timers.unregister(server_debug)
         bpy.app.timers.unregister(data_transfer)
         return {"FINISHED"}
