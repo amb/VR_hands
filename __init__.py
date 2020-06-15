@@ -15,6 +15,7 @@ import bpy
 from . import server
 import pprint
 import numpy as np
+from mathutils import Matrix, Quaternion
 import mathutils as mu
 from . import qt
 
@@ -36,6 +37,7 @@ bl_info = {
 class PG_VRHands(bpy.types.PropertyGroup):
     active: bpy.props.BoolProperty(name="Running", default=False)
     armature: bpy.props.PointerProperty(name="Armature", type=bpy.types.Object)
+    empty: bpy.props.PointerProperty(name="Empty", type=bpy.types.Object)
 
 
 def dm(m, d):
@@ -43,12 +45,28 @@ def dm(m, d):
 
 
 def ncoords(a):
-    return mu.Vector([-a[0], -a[2], -a[1]]) / 1000.0
+    return mu.Vector([a[0], a[1], a[2]]) / 1000.0
 
 
 def server_debug():
     ppp.pprint(server.data)
     return 0.5
+
+
+def get_vr_camera():
+    wm = bpy.context.window_manager
+    if not hasattr(wm.xr_session_state, "viewer_pose_location"):
+        return None
+
+    loc = wm.xr_session_state.viewer_pose_location
+    rot = wm.xr_session_state.viewer_pose_rotation
+
+    rotmat = Matrix.Identity(3)
+    rotmat.rotate(rot)
+    rotmat.resize_4x4()
+    transmat = Matrix.Translation(loc)
+
+    return transmat @ rotmat
 
 
 # ARM_NAME = "Root"
@@ -77,6 +95,11 @@ def data_transfer():
     bones = obj.pose.bones
     data = server.data
 
+    cam = get_vr_camera()
+    # rot = Matrix.Rotation(-np.pi / 2.0, 4, "X")
+    if cam:
+        bpy.context.scene.vr_hands.empty.matrix_world = cam
+
     if "right" in data:
         dr = data["right"]
         ploc = ncoords(dr["palm_position"])
@@ -85,6 +108,10 @@ def data_transfer():
         pdir = ncoords(dr["direction"])
         hand_q = lookrotation(pdir, pnorm)
         bones["wrist_r"].rotation_quaternion = hand_q
+
+        # vr_cam = get_vr_camera()
+        # obj.rotation_quaternion @= vr_cam.to_quaternion().inverted()
+        # bones["wrist_r"].location += vr_cam.translation
 
         # pnorm_f = mu.Vector([pnorm.y, pnorm.z, pnorm.x])
         # print(bones["wrist_r"].z_axis, pnorm_f)
@@ -160,6 +187,9 @@ class OBJECT_PT_VRH_main(bpy.types.Panel):
         row = col.row()
         row.label(text="Armature Root:")
         row.prop(context.scene.vr_hands, "armature", text="")
+        row = col.row()
+        row.label(text="HMD Empty:")
+        row.prop(context.scene.vr_hands, "empty", text="")
         row = col.row()
         b = row.box()
         if not bpy.context.scene.vr_hands.active:

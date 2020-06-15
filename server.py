@@ -95,6 +95,7 @@ data = {}
 listener = LeapListener()
 listener.set_params(data)
 controller = Leap.Controller()
+controller.set_policy(controller.POLICY_OPTIMIZE_HMD)
 
 
 def start():
