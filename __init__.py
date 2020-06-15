@@ -98,12 +98,17 @@ def data_transfer():
                 # TODO: why is this coordinate system wrong and needs a fix?
                 vdif_f = mu.Vector([vdif.y, vdif.z, vdif.x])
 
-                # bb.location = vdif
                 bb = bones["finger_{}_{}_r".format(finger_names[f], j - 1)]
-                bone_up = -bb.parent.z_axis
 
                 bb.rotation_mode = "XYZ"
-                bb.rotation_euler.x = bone_up.angle(vdif_f) - np.pi / 2.0 - 0.3
+
+                # flex
+                bone_up = -bb.parent.z_axis
+                bb.rotation_euler.x = bone_up.angle(vdif_f) - np.pi / 2.0 - 0.35
+                if not (f == 0 and j == 1):
+                    # separation
+                    bone_left = bb.parent.x_axis
+                    bb.rotation_euler.z = bone_left.angle(vdif_f) - np.pi / 2.0
 
                 # bb.rotation_quaternion = lookat(vdif, bone_z_up)
                 # bb.rotation_quaternion = lookrotation(vdif, bone_up)
