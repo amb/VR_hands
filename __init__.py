@@ -81,20 +81,32 @@ def data_transfer():
         dr = data["right"]
         ploc = ncoords(dr["palm_position"])
         bones["wrist_r"].location = ploc
-        pnorm = ncoords(dr["palm_normal"])
+        pnorm = ncoords(dr["palm_normal"]).normalized()
         pdir = ncoords(dr["direction"])
-        bones["wrist_r"].rotation_quaternion = lookrotation(pdir, pnorm)
+        hand_q = lookrotation(pdir, pnorm)
+        bones["wrist_r"].rotation_quaternion = hand_q
+
+        # pnorm_f = mu.Vector([pnorm.y, pnorm.z, pnorm.x])
+        # print(bones["wrist_r"].z_axis, pnorm_f)
 
         for f in range(5):
             for j in range(1, 4):
                 jt = "finger_{}_{}".format(f, j)
                 jprev = ncoords(dr[jt + "_prev_joint"])
                 jnext = ncoords(dr[jt + "_next_joint"])
-                bb = bones["finger_{}_{}_r".format(finger_names[f], j - 1)]
                 vdif = jnext - jprev
+                # TODO: why is this coordinate system wrong and needs a fix?
+                vdif_f = mu.Vector([vdif.y, vdif.z, vdif.x])
+
                 # bb.location = vdif
-                bb.rotation_quaternion = lookat(vdif, mu.Vector([0.0, 1.0, 0.0]))
-                # bb.rotation_quaternion = lookrotation(vdif, pnorm)
+                bb = bones["finger_{}_{}_r".format(finger_names[f], j - 1)]
+                bone_up = -bb.parent.z_axis
+
+                bb.rotation_mode = "XYZ"
+                bb.rotation_euler.x = bone_up.angle(vdif_f) - np.pi / 2.0 - 0.3
+
+                # bb.rotation_quaternion = lookat(vdif, bone_z_up)
+                # bb.rotation_quaternion = lookrotation(vdif, bone_up)
 
     # 100 fps
     return 0.01
